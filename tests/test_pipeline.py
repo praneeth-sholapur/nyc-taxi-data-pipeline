@@ -7,6 +7,7 @@ from taxi_pipeline.config import (
     DatasetPartition,
     PipelinePaths,
 )
+from taxi_pipeline.gold import GoldBuildResult
 from taxi_pipeline.ingestion import DownloadResult
 from taxi_pipeline.pipeline import run_pipeline
 from taxi_pipeline.quality import QualityReport
@@ -26,6 +27,15 @@ def test_run_pipeline_completes_and_records_audit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     paths = PipelinePaths(tmp_path / "data")
+    expected_gold_path = (
+        paths.silver.parent
+        / "gold"
+        / "pickup_zone_hourly"
+        / "taxi_type=yellow"
+        / "year=2024"
+        / "month=01"
+        / "metrics.parquet"
+    )
 
     def fake_download(
         url: str,
@@ -61,6 +71,24 @@ def test_run_pipeline_completes_and_records_audit(
             passed=True,
         )
 
+    def fake_gold(
+        data_root: Path,
+        taxi_type: str,
+        year: int,
+        month: int,
+    ) -> GoldBuildResult:
+        assert data_root == paths.silver.parent
+        assert taxi_type == "yellow"
+        assert year == 2024
+        assert month == 1
+
+        return GoldBuildResult(
+            source_rows=98,
+            gold_rows=20,
+            total_trip_count=98,
+            output_path=expected_gold_path,
+        )
+
     monkeypatch.setattr(
         "taxi_pipeline.pipeline.download_parquet",
         fake_download,
@@ -73,6 +101,10 @@ def test_run_pipeline_completes_and_records_audit(
         "taxi_pipeline.pipeline.validate_partition_outputs",
         fake_quality,
     )
+    monkeypatch.setattr(
+        "taxi_pipeline.pipeline.build_gold_partition",
+        fake_gold,
+    )
 
     result = run_pipeline(
         partition=_partition(),
@@ -83,6 +115,9 @@ def test_run_pipeline_completes_and_records_audit(
     assert result.source_rows == 100
     assert result.silver_rows == 98
     assert result.quarantine_rows == 2
+    assert result.gold_rows == 20
+    assert result.gold_trip_count == 98
+    assert result.gold_path == expected_gold_path
     assert result.quality_passed is True
 
     with duckdb.connect(
@@ -97,9 +132,26 @@ def test_run_pipeline_completes_and_records_audit(
                 source_rows,
                 silver_rows,
                 quarantine_rows,
+                gold_path,
+                gold_rows,
+                gold_trip_count,
                 quality_passed
             FROM pipeline_runs
             WHERE run_id = ?
+            """,
+            [result.run_id],
+        ).fetchone()
+
+        gold_quality_row = connection.execute(
+            """
+            SELECT
+                passed,
+                observed_value,
+                expected_value
+            FROM quality_results
+            WHERE
+                run_id = ?
+                AND check_name = 'gold_trip_reconciliation'
             """,
             [result.run_id],
         ).fetchone()
@@ -110,7 +162,15 @@ def test_run_pipeline_completes_and_records_audit(
         100,
         98,
         2,
+        str(expected_gold_path),
+        20,
+        98,
         True,
+    )
+    assert gold_quality_row == (
+        True,
+        "98",
+        "98",
     )
 
 

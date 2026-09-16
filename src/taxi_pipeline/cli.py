@@ -291,9 +291,9 @@ def run_full_pipeline(args: argparse.Namespace) -> None:
     output["quarantine_path"] = str(
         result.quarantine_path
     )
+    output["gold_path"] = str(result.gold_path)
 
     print(json.dumps(output, indent=2))
-
 
 def main() -> None:
     """Run the requested pipeline command."""

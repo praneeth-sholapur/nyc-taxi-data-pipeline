@@ -13,6 +13,7 @@ def test_successful_audit_run_records_metrics(
     tmp_path: Path,
 ) -> None:
     audit_db = tmp_path / "audit.duckdb"
+    gold_path = Path("data/gold/metrics.parquet")
 
     run_id = start_audit_run(
         audit_db=audit_db,
@@ -32,6 +33,10 @@ def test_successful_audit_run_records_metrics(
         duplicate_trip_ids=0,
         invalid_silver_rows=0,
         quality_passed=True,
+        gold_path=gold_path,
+        gold_rows=20,
+        gold_trip_count=98,
+        gold_reconciled=True,
     )
 
     with duckdb.connect(
@@ -48,6 +53,9 @@ def test_successful_audit_run_records_metrics(
                 source_rows,
                 silver_rows,
                 quarantine_rows,
+                gold_path,
+                gold_rows,
+                gold_trip_count,
                 quality_passed,
                 error_message
             FROM pipeline_runs
@@ -78,11 +86,20 @@ def test_successful_audit_run_records_metrics(
         100,
         98,
         2,
+        str(gold_path),
+        20,
+        98,
         True,
         None,
     )
 
     assert quality_rows == [
+        (
+            "gold_trip_reconciliation",
+            True,
+            "98",
+            "98",
+        ),
         (
             "row_reconciliation",
             True,

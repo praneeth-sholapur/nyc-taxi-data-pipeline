@@ -10,7 +10,7 @@ import duckdb
 def _initialize_tables(
     connection: duckdb.DuckDBPyConnection,
 ) -> None:
-    """Create audit tables when they do not already exist."""
+    """Create audit tables and add newer columns when required."""
     connection.execute(
         """
         CREATE TABLE IF NOT EXISTS pipeline_runs (
@@ -26,8 +26,30 @@ def _initialize_tables(
             silver_rows BIGINT,
             quarantine_rows BIGINT,
             quality_passed BOOLEAN,
-            error_message VARCHAR
+            error_message VARCHAR,
+            gold_path VARCHAR,
+            gold_rows BIGINT,
+            gold_trip_count BIGINT
         )
+        """
+    )
+
+    connection.execute(
+        """
+        ALTER TABLE pipeline_runs
+        ADD COLUMN IF NOT EXISTS gold_path VARCHAR
+        """
+    )
+    connection.execute(
+        """
+        ALTER TABLE pipeline_runs
+        ADD COLUMN IF NOT EXISTS gold_rows BIGINT
+        """
+    )
+    connection.execute(
+        """
+        ALTER TABLE pipeline_runs
+        ADD COLUMN IF NOT EXISTS gold_trip_count BIGINT
         """
     )
 
@@ -94,6 +116,10 @@ def complete_audit_run(
     duplicate_trip_ids: int,
     invalid_silver_rows: int,
     quality_passed: bool,
+    gold_path: Path,
+    gold_rows: int,
+    gold_trip_count: int,
+    gold_reconciled: bool,
 ) -> None:
     """Complete a successful pipeline audit record."""
     completed_at = datetime.now(timezone.utc)
@@ -115,7 +141,10 @@ def complete_audit_run(
                 silver_rows = ?,
                 quarantine_rows = ?,
                 quality_passed = ?,
-                error_message = NULL
+                error_message = NULL,
+                gold_path = ?,
+                gold_rows = ?,
+                gold_trip_count = ?
             WHERE run_id = ?
             """,
             [
@@ -127,6 +156,9 @@ def complete_audit_run(
                 silver_rows,
                 quarantine_rows,
                 quality_passed,
+                str(gold_path),
+                gold_rows,
+                gold_trip_count,
                 run_id,
             ],
         )
@@ -152,6 +184,13 @@ def complete_audit_run(
                 invalid_silver_rows == 0,
                 str(invalid_silver_rows),
                 "0",
+            ),
+            (
+                run_id,
+                "gold_trip_reconciliation",
+                gold_reconciled,
+                str(gold_trip_count),
+                str(silver_rows),
             ),
         ]
 
