@@ -11,6 +11,10 @@ from taxi_pipeline.config import (
     load_manifest,
     select_partition,
 )
+from taxi_pipeline.dimensions import (
+    TAXI_ZONE_LOOKUP_URL,
+    build_taxi_zone_dimension,
+)
 from taxi_pipeline.gold import build_gold_partition
 from taxi_pipeline.ingestion import download_parquet
 from taxi_pipeline.pipeline import run_pipeline
@@ -93,6 +97,20 @@ def build_parser() -> argparse.ArgumentParser:
         help="Create business-ready Gold metrics",
     )
     add_partition_arguments(gold)
+
+    dimension = subparsers.add_parser(
+        "dimension",
+        help="Build the taxi-zone dimension",
+    )
+    dimension.add_argument(
+        "--data-root",
+        type=Path,
+        default=Path("data"),
+    )
+    dimension.add_argument(
+        "--url",
+        default=TAXI_ZONE_LOOKUP_URL,
+    )
 
     run = subparsers.add_parser(
         "run",
@@ -277,6 +295,20 @@ def build_gold_metrics(args: argparse.Namespace) -> None:
     print(json.dumps(output, indent=2))
 
 
+def build_zone_dimension(args: argparse.Namespace) -> None:
+    """Build the validated taxi-zone dimension."""
+    result = build_taxi_zone_dimension(
+        data_root=args.data_root,
+        url=args.url,
+    )
+
+    output = asdict(result)
+    output["source_path"] = str(result.source_path)
+    output["output_path"] = str(result.output_path)
+
+    print(json.dumps(output, indent=2))
+
+
 def run_full_pipeline(args: argparse.Namespace) -> None:
     """Run the complete audited pipeline."""
     partition, paths, _bronze_path = resolve_partition(args)
@@ -295,6 +327,7 @@ def run_full_pipeline(args: argparse.Namespace) -> None:
 
     print(json.dumps(output, indent=2))
 
+
 def main() -> None:
     """Run the requested pipeline command."""
     parser = build_parser()
@@ -310,6 +343,8 @@ def main() -> None:
         validate_partition(args)
     elif args.command == "gold":
         build_gold_metrics(args)
+    elif args.command == "dimension":
+        build_zone_dimension(args)
     elif args.command == "run":
         run_full_pipeline(args)
 
