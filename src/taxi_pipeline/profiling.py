@@ -18,6 +18,27 @@ def get_parquet_schema(path: Path) -> list[tuple[str, str]]:
         for row in rows
     ]
 
+def count_exact_duplicate_rows(path: Path) -> int:
+    """Count additional copies of completely identical source rows."""
+    query = """
+        SELECT COALESCE(SUM(occurrences - 1), 0)
+        FROM (
+            SELECT
+                *,
+                COUNT(*) AS occurrences
+            FROM read_parquet(?)
+            GROUP BY ALL
+            HAVING COUNT(*) > 1
+        )
+    """
+
+    with duckdb.connect() as connection:
+        result = connection.execute(
+            query,
+            [str(path.resolve())],
+        ).fetchone()
+
+    return int(result[0]) if result else 0
 
 def profile_yellow_trips(
     path: Path,

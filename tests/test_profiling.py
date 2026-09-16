@@ -4,10 +4,31 @@ from pathlib import Path
 import duckdb
 
 from taxi_pipeline.profiling import (
+    count_exact_duplicate_rows,
     get_parquet_schema,
     profile_yellow_trips,
 )
 
+def test_count_exact_duplicate_rows(tmp_path: Path) -> None:
+    parquet_path = tmp_path / "duplicates.parquet"
+    safe_path = parquet_path.resolve().as_posix().replace("'", "''")
+
+    query = """
+        SELECT *
+        FROM (
+            VALUES
+                (1, 'card'),
+                (1, 'card'),
+                (2, 'cash')
+        ) AS trips(trip_id, payment_method)
+    """
+
+    with duckdb.connect() as connection:
+        connection.execute(
+            f"COPY ({query}) TO '{safe_path}' (FORMAT PARQUET)"
+        )
+
+    assert count_exact_duplicate_rows(parquet_path) == 1
 
 def _create_profile_fixture(path: Path) -> None:
     safe_path = path.resolve().as_posix().replace("'", "''")

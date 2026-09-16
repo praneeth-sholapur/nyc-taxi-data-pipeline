@@ -13,9 +13,11 @@ from taxi_pipeline.config import (
 )
 from taxi_pipeline.ingestion import download_parquet
 from taxi_pipeline.profiling import (
+    count_exact_duplicate_rows,
     get_parquet_schema,
     profile_yellow_trips,
 )
+from taxi_pipeline.transformation import transform_yellow_partition
 
 
 def add_partition_arguments(
@@ -71,7 +73,24 @@ def build_parser() -> argparse.ArgumentParser:
     )
     add_partition_arguments(profile)
 
+    transform = subparsers.add_parser(
+        "transform",
+        help="Create silver and quarantine outputs",
+    )
+    add_partition_arguments(transform)
+
     return parser
+
+
+def get_partition_directory(
+    partition: DatasetPartition,
+) -> Path:
+    """Return the Hive-style directory for one partition."""
+    return (
+        Path(f"taxi_type={partition.taxi_type}")
+        / f"year={partition.year}"
+        / f"month={partition.month:02d}"
+    )
 
 
 def resolve_partition(
@@ -86,12 +105,8 @@ def resolve_partition(
         taxi_type=args.taxi_type,
     )
     paths = PipelinePaths(args.data_root)
+    partition_directory = get_partition_directory(partition)
 
-    partition_directory = (
-        Path(f"taxi_type={partition.taxi_type}")
-        / f"year={partition.year}"
-        / f"month={partition.month:02d}"
-    )
     bronze_path = (
         paths.bronze
         / partition_directory
@@ -134,10 +149,14 @@ def profile_partition(args: argparse.Namespace) -> None:
         }
         for column_name, data_type in get_parquet_schema(bronze_path)
     ]
+
     profile = profile_yellow_trips(
-    bronze_path,
-    year=partition.year,
-    month=partition.month,
+        bronze_path,
+        year=partition.year,
+        month=partition.month,
+    )
+    profile["exact_duplicate_rows"] = (
+        count_exact_duplicate_rows(bronze_path)
     )
 
     output = {
@@ -149,6 +168,47 @@ def profile_partition(args: argparse.Namespace) -> None:
     print(json.dumps(output, indent=2, default=str))
 
 
+def transform_partition(args: argparse.Namespace) -> None:
+    """Create silver and quarantine outputs for one partition."""
+    partition, paths, bronze_path = resolve_partition(args)
+
+    if not bronze_path.exists():
+        raise FileNotFoundError(
+            f"Bronze source does not exist: {bronze_path}. "
+            "Run the ingest command first."
+        )
+
+    paths.ensure()
+    partition_directory = get_partition_directory(partition)
+
+    silver_path = (
+        paths.silver
+        / partition_directory
+        / "trips.parquet"
+    )
+    quarantine_path = (
+        paths.quarantine
+        / partition_directory
+        / "rejected.parquet"
+    )
+
+    result = transform_yellow_partition(
+        source_path=bronze_path,
+        silver_path=silver_path,
+        quarantine_path=quarantine_path,
+        year=partition.year,
+        month=partition.month,
+    )
+
+    output = asdict(result)
+    output["silver_path"] = str(result.silver_path)
+    output["quarantine_path"] = str(
+        result.quarantine_path
+    )
+
+    print(json.dumps(output, indent=2))
+
+
 def main() -> None:
     """Run the requested pipeline command."""
     parser = build_parser()
@@ -158,6 +218,8 @@ def main() -> None:
         ingest_partition(args)
     elif args.command == "profile":
         profile_partition(args)
+    elif args.command == "transform":
+        transform_partition(args)
 
 
 if __name__ == "__main__":
