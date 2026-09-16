@@ -11,6 +11,7 @@ from taxi_pipeline.config import (
     load_manifest,
     select_partition,
 )
+from taxi_pipeline.gold import build_gold_partition
 from taxi_pipeline.ingestion import download_parquet
 from taxi_pipeline.pipeline import run_pipeline
 from taxi_pipeline.profiling import (
@@ -86,6 +87,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Validate transformed partition outputs",
     )
     add_partition_arguments(validate)
+
+    gold = subparsers.add_parser(
+        "gold",
+        help="Create business-ready Gold metrics",
+    )
+    add_partition_arguments(gold)
 
     run = subparsers.add_parser(
         "run",
@@ -253,6 +260,23 @@ def validate_partition(args: argparse.Namespace) -> None:
         raise SystemExit(1)
 
 
+def build_gold_metrics(args: argparse.Namespace) -> None:
+    """Create Gold metrics for one transformed partition."""
+    partition, _paths, _bronze_path = resolve_partition(args)
+
+    result = build_gold_partition(
+        data_root=args.data_root,
+        taxi_type=partition.taxi_type,
+        year=partition.year,
+        month=partition.month,
+    )
+
+    output = asdict(result)
+    output["output_path"] = str(result.output_path)
+
+    print(json.dumps(output, indent=2))
+
+
 def run_full_pipeline(args: argparse.Namespace) -> None:
     """Run the complete audited pipeline."""
     partition, paths, _bronze_path = resolve_partition(args)
@@ -284,6 +308,8 @@ def main() -> None:
         transform_partition(args)
     elif args.command == "validate":
         validate_partition(args)
+    elif args.command == "gold":
+        build_gold_metrics(args)
     elif args.command == "run":
         run_full_pipeline(args)
 
