@@ -17,6 +17,7 @@ from taxi_pipeline.profiling import (
     get_parquet_schema,
     profile_yellow_trips,
 )
+from taxi_pipeline.quality import validate_partition_outputs
 from taxi_pipeline.transformation import transform_yellow_partition
 
 
@@ -78,6 +79,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Create silver and quarantine outputs",
     )
     add_partition_arguments(transform)
+
+    validate = subparsers.add_parser(
+        "validate",
+        help="Validate transformed partition outputs",
+    )
+    add_partition_arguments(validate)
 
     return parser
 
@@ -209,6 +216,41 @@ def transform_partition(args: argparse.Namespace) -> None:
     print(json.dumps(output, indent=2))
 
 
+def validate_partition(args: argparse.Namespace) -> None:
+    """Validate one transformed partition."""
+    partition, paths, bronze_path = resolve_partition(args)
+    partition_directory = get_partition_directory(partition)
+
+    silver_path = (
+        paths.silver
+        / partition_directory
+        / "trips.parquet"
+    )
+    quarantine_path = (
+        paths.quarantine
+        / partition_directory
+        / "rejected.parquet"
+    )
+
+    report = validate_partition_outputs(
+        source_path=bronze_path,
+        silver_path=silver_path,
+        quarantine_path=quarantine_path,
+        year=partition.year,
+        month=partition.month,
+    )
+
+    print(
+        json.dumps(
+            asdict(report),
+            indent=2,
+        )
+    )
+
+    if not report.passed:
+        raise SystemExit(1)
+
+
 def main() -> None:
     """Run the requested pipeline command."""
     parser = build_parser()
@@ -220,6 +262,8 @@ def main() -> None:
         profile_partition(args)
     elif args.command == "transform":
         transform_partition(args)
+    elif args.command == "validate":
+        validate_partition(args)
 
 
 if __name__ == "__main__":
