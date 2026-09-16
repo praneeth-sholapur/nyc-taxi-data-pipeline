@@ -12,6 +12,7 @@ from taxi_pipeline.config import (
     select_partition,
 )
 from taxi_pipeline.ingestion import download_parquet
+from taxi_pipeline.pipeline import run_pipeline
 from taxi_pipeline.profiling import (
     count_exact_duplicate_rows,
     get_parquet_schema,
@@ -85,6 +86,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Validate transformed partition outputs",
     )
     add_partition_arguments(validate)
+
+    run = subparsers.add_parser(
+        "run",
+        help="Run the complete audited pipeline",
+    )
+    add_partition_arguments(run)
 
     return parser
 
@@ -240,15 +247,28 @@ def validate_partition(args: argparse.Namespace) -> None:
         month=partition.month,
     )
 
-    print(
-        json.dumps(
-            asdict(report),
-            indent=2,
-        )
-    )
+    print(json.dumps(asdict(report), indent=2))
 
     if not report.passed:
         raise SystemExit(1)
+
+
+def run_full_pipeline(args: argparse.Namespace) -> None:
+    """Run the complete audited pipeline."""
+    partition, paths, _bronze_path = resolve_partition(args)
+
+    result = run_pipeline(
+        partition=partition,
+        paths=paths,
+    )
+
+    output = asdict(result)
+    output["silver_path"] = str(result.silver_path)
+    output["quarantine_path"] = str(
+        result.quarantine_path
+    )
+
+    print(json.dumps(output, indent=2))
 
 
 def main() -> None:
@@ -264,6 +284,8 @@ def main() -> None:
         transform_partition(args)
     elif args.command == "validate":
         validate_partition(args)
+    elif args.command == "run":
+        run_full_pipeline(args)
 
 
 if __name__ == "__main__":
