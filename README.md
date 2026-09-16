@@ -2,7 +2,7 @@
 
 A production-style data engineering pipeline that processes official NYC taxi trip records into validated, partitioned, and analytics-ready datasets.
 
-The project currently processes **9.55 million source records** across three monthly partitions and includes resilient ingestion, Bronze/Silver/Gold modeling, rejected-record quarantine, automated quality gates, run auditing, repeatable execution, and measured query-performance improvements.
+The project currently processes **9.55 million source records** across three monthly partitions and includes resilient ingestion, Bronze/Silver/Gold modeling, rejected-record quarantine, automated quality gates, run auditing, repeatable execution, continuous integration, and measured query-performance improvements.
 
 ## Business Problem
 
@@ -20,6 +20,7 @@ This project addresses those needs with a monthly incremental pipeline that:
 - Produces business-ready Gold metrics.
 - Reconciles row counts between every layer.
 - Records pipeline runs and quality-check results.
+- Runs automated linting and tests through GitHub Actions.
 
 ## Architecture
 
@@ -63,6 +64,7 @@ Data processed: NYC Yellow Taxi trips for January through March 2024.
 | Automated tests | 23 passing |
 | Gold input-row reduction | 97.48% |
 | Measured analytical-query speedup | 5.32× |
+| GitHub Actions CI | Passing |
 
 No records disappear between Bronze and the downstream layers:
 
@@ -143,6 +145,7 @@ Implemented and verified:
 - Pytest
 - Ruff
 - Git
+- GitHub Actions
 
 Cloud and orchestration technologies are intentionally excluded from the implemented list until they are actually added and validated.
 
@@ -150,6 +153,9 @@ Cloud and orchestration technologies are intentionally excluded from the impleme
 
 ```text
 nyc-taxi-data-pipeline/
+├── .github/
+│   └── workflows/
+│       └── ci.yml
 ├── config/
 │   └── manifest.json
 ├── docs/
@@ -264,9 +270,9 @@ The equivalent Gold query was **5.32× faster** and scanned **97.48% fewer rows*
 
 Timing is hardware- and cache-dependent. The benchmark uses one warm-up followed by the median of 15 complete executions.
 
-## Testing and Code Quality
+## Testing and Continuous Integration
 
-Run all automated checks:
+Run all automated checks locally:
 
 ```powershell
 python -m ruff check src tests scripts
@@ -278,6 +284,14 @@ Current verified result:
 ```text
 23 passed
 ```
+
+The GitHub Actions workflow runs the same Ruff and Pytest checks automatically on:
+
+- Pushes to `main`
+- Pull requests targeting `main`
+- Manual workflow runs
+
+The first verified GitHub Actions run completed successfully in 18 seconds.
 
 ## Evidence and Documentation
 
@@ -298,7 +312,6 @@ The project uses official [NYC Taxi and Limousine Commission Trip Record Data](h
 
 Potential future extensions:
 
-- GitHub Actions continuous integration
 - Docker-based reproducible runtime
 - Workflow orchestration
 - dbt-managed analytical models
