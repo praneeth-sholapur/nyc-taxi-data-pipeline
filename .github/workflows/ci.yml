@@ -43,3 +43,42 @@ jobs:
 
       - name: Run tests
         run: python -m pytest
+
+  container:
+    name: Build and verify container
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Build test image
+        run: |
+          docker build \
+            --target test \
+            --tag nyc-taxi-data-pipeline:test \
+            .
+
+      - name: Build runtime image
+        run: |
+          docker build \
+            --target runtime \
+            --tag nyc-taxi-data-pipeline:ci \
+            .
+
+      - name: Verify runtime CLI
+        run: |
+          docker run --rm \
+            nyc-taxi-data-pipeline:ci \
+            --help
+
+      - name: Verify non-root runtime
+        run: |
+          runtime_uid="$(
+            docker run --rm \
+              --entrypoint id \
+              nyc-taxi-data-pipeline:ci \
+              -u
+          )"
+          test "$runtime_uid" = "10001"
