@@ -1,0 +1,24 @@
+# Project-specific Python environment
+.venv/
+
+# Python-generated cache files
+__pycache__/
+*.py[cod]
+
+# Testing and linting caches
+.pytest_cache/
+.ruff_cache/
+
+# Downloaded and generated data
+data/
+artifacts/
+
+# Local databases and write-ahead logs
+*.duckdb
+*.duckdb.wal
+
+# Credentials and environment variables
+.env
+
+# Local editor settings
+.vscode/
