@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from taxi_pipeline.config import DatasetPartition, load_manifest, select_partition
+from taxi_pipeline.config import DatasetPartition,PipelinePaths, load_manifest, select_partition
 
 
 def test_load_and_select_partition(tmp_path: Path) -> None:
@@ -40,3 +40,17 @@ def test_select_partition_rejects_missing_month() -> None:
 
     with pytest.raises(ValueError, match="found 0"):
         select_partition(manifest, year=2024, month=2)
+
+
+def test_pipeline_paths_create_required_directories(
+    tmp_path: Path,
+) -> None:
+    paths = PipelinePaths(tmp_path / "data")
+
+    paths.ensure()
+
+    assert paths.bronze.is_dir()
+    assert paths.silver.is_dir()
+    assert paths.quarantine.is_dir()
+    assert paths.gold.is_dir()
+    assert paths.audit_db == tmp_path / "data" / "audit.duckdb"        

@@ -24,6 +24,41 @@ class DatasetPartition:
         """Return the expected source filename."""
         return f"{self.taxi_type}_tripdata_{self.year}-{self.month:02d}.parquet"
 
+@dataclass(frozen=True)
+class PipelinePaths:
+    """Filesystem locations used by the local pipeline."""
+
+    root: Path
+
+    @property
+    def bronze(self) -> Path:
+        return self.root / "bronze"
+
+    @property
+    def silver(self) -> Path:
+        return self.root / "silver"
+
+    @property
+    def quarantine(self) -> Path:
+        return self.root / "quarantine"
+
+    @property
+    def gold(self) -> Path:
+        return self.root / "gold"
+
+    @property
+    def audit_db(self) -> Path:
+        return self.root / "audit.duckdb"
+
+    def ensure(self) -> None:
+        """Create the required data-layer directories."""
+        for path in (
+            self.bronze,
+            self.silver,
+            self.quarantine,
+            self.gold,
+        ):
+            path.mkdir(parents=True, exist_ok=True)
 
 def load_manifest(path: Path) -> list[DatasetPartition]:
     """Load dataset partitions from a JSON manifest."""
