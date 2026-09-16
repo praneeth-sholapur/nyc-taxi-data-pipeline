@@ -5,6 +5,12 @@
       "year": 2024,
       "month": 1,
       "url": "https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2024-01.parquet"
+    },
+    {
+      "taxi_type": "yellow",
+      "year": 2024,
+      "month": 2,
+      "url": "https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2024-02.parquet"
     }
   ]
 }
