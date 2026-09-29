@@ -40,7 +40,7 @@ jobs:
           python -m pip install -e ".[dev]"
 
       - name: Run Ruff
-        run: python -m ruff check src tests scripts
+        run: python -m ruff check src tests scripts aws
 
       - name: Run tests
         run: python -m pytest
