@@ -1,9 +1,5 @@
-# Project-specific Python environment
-.venv/
-
-# Python-generated cache files
-__pycache__/
 *.py[cod]
+.venv/
 
 # Testing and linting caches
 .pytest_cache/
@@ -22,3 +18,17 @@ artifacts/
 
 # Local editor settings
 .vscode/
+
+# Terraform working files and local state
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+*.tfplan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
