@@ -45,6 +45,10 @@ resource "aws_s3_bucket_versioning" "data_lake" {
 resource "aws_s3_bucket_lifecycle_configuration" "data_lake" {
   bucket = aws_s3_bucket.data_lake.id
 
+  depends_on = [
+    aws_s3_bucket_versioning.data_lake,
+  ]
+
   rule {
     id     = "control-storage-costs"
     status = "Enabled"
@@ -57,6 +61,32 @@ resource "aws_s3_bucket_lifecycle_configuration" "data_lake" {
 
     noncurrent_version_expiration {
       noncurrent_days = 30
+    }
+  }
+
+  rule {
+    id     = "expire-athena-query-results"
+    status = "Enabled"
+
+    filter {
+      prefix = "athena-results/"
+    }
+
+    expiration {
+      days = 7
+    }
+  }
+
+  rule {
+    id     = "expire-glue-temporary-files"
+    status = "Enabled"
+
+    filter {
+      prefix = "glue-temp/"
+    }
+
+    expiration {
+      days = 7
     }
   }
 }
